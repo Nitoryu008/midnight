@@ -9,6 +9,8 @@ use midi::{Channel, Channels, Tempo, Track};
 mod player;
 use player::Playback;
 
+use crate::player::PlaybackState;
+
 fn main() {
     let raw = fs::read("test.mid").expect("cannot open test file").leak();
     let smf = Smf::parse(raw).expect("cannot parse midi file");
@@ -26,7 +28,10 @@ fn main() {
         .insert_resource(midi::Tempo::from_bpm(120.0))
         .insert_resource(Playback::new())
         .add_systems(Startup, setup)
-        .add_systems(Update, (update_events, update_texts).chain())
+        .add_systems(
+            Update,
+            (update_midi_events, update_key_events, update_texts).chain(),
+        )
         .run();
 }
 
@@ -52,7 +57,6 @@ fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time
     commands.spawn(Camera2d);
 
     let mut title: &str = "";
-    let current_secs = time.elapsed_secs_f64();
 
     for (index, track) in smf_data.smf.tracks.iter().enumerate() {
         for event in track {
@@ -73,13 +77,8 @@ fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time
 
         commands.spawn(Track {
             number: index,
-            next_event_secs: current_secs
-                + midi::get_delta_secs(
-                    smf_data.timing_unit,
-                    track[0].delta.as_int() as f64,
-                    tempo.secs(),
-                ),
-            current_index: 0,
+            delta_secs: 0.,
+            next_event_index: 0,
         });
     }
 
@@ -154,7 +153,20 @@ fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time
         ));
 }
 
-fn update_events(
+fn update_key_events(keys: Res<ButtonInput<KeyCode>>, mut playback: ResMut<Playback>) {
+    if keys.just_pressed(KeyCode::Space) {
+        match playback.state() {
+            PlaybackState::Playing => {
+                playback.pause();
+            }
+            PlaybackState::Paused | PlaybackState::Stopped => {
+                playback.play();
+            }
+        }
+    }
+}
+
+fn update_midi_events(
     mut commands: Commands,
     smf_data: ResMut<SmfData>,
     time: Res<Time>,
@@ -163,40 +175,30 @@ fn update_events(
     mut tempo: ResMut<Tempo>,
     mut playback: ResMut<Playback>,
 ) {
-    playback.add_secs(time.delta_secs_f64());
     let channels = &mut channels.single_mut().unwrap().0;
 
     for mut track in tracks {
-        if track.next_event_secs > playback.secs() {
-            continue;
-        }
+        let events: &Vec<TrackEvent<'static>> = &smf_data.smf.tracks[track.number];
+        track.delta_secs += time.delta_secs_f64();
+
         loop {
-            let track_data = &smf_data.smf.tracks[track.number];
-            match track_data.get(track.current_index) {
-                Some(event) => {
-                    on_track_event(event, channels, &mut tempo);
+            if track.next_event_index >= events.len() {
+                break;
+            }
 
-                    track.current_index += 1;
-                    let event = match track_data.get(track.current_index) {
-                        Some(e) => e,
-                        None => {
-                            break;
-                        }
-                    };
+            let event = &events[track.next_event_index];
+            let midi_delta_secs = midi::get_delta_secs(
+                smf_data.timing_unit,
+                event.delta.as_int() as f64,
+                tempo.secs(),
+            );
 
-                    if event.delta != 0 {
-                        track.next_event_secs = playback.secs()
-                            + midi::get_delta_secs(
-                                smf_data.timing_unit,
-                                event.delta.as_int() as f64,
-                                tempo.secs(),
-                            );
-                        break;
-                    }
-                }
-                None => {
-                    break;
-                }
+            if track.delta_secs >= midi_delta_secs {
+                on_track_event(event, channels, &mut tempo);
+                track.next_event_index += 1;
+                track.delta_secs -= midi_delta_secs;
+            } else {
+                break;
             }
         }
     }

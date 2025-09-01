@@ -3,8 +3,8 @@ use bevy::{platform::collections::HashSet, prelude::*};
 #[derive(Component)]
 pub struct Track {
     pub number: usize,
-    pub next_event_secs: f64,
-    pub current_index: usize,
+    pub delta_secs: f64,
+    pub next_event_index: usize,
 }
 
 #[derive(Debug)]
@@ -44,6 +44,7 @@ impl Tempo {
         Self { secs: 60.0 / bpm }
     }
 
+    /// Returns the duration of a quarter note.
     pub fn secs(&self) -> f64 {
         self.secs
     }
@@ -65,6 +66,5 @@ impl Tempo {
 
 pub fn get_delta_secs(timing_unit: f64, delta_time: f64, tempo_secs: f64) -> f64 {
     let delta = delta_time / timing_unit * tempo_secs;
-    println!("{}", delta);
     delta
 }

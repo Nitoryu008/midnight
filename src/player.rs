@@ -6,7 +6,8 @@ pub struct Playback {
     state: PlaybackState,
 }
 
-enum PlaybackState {
+#[derive(Clone, Copy, PartialEq)]
+pub enum PlaybackState {
     Stopped,
     Playing,
     Paused,
@@ -20,21 +21,25 @@ impl Playback {
         }
     }
 
-    pub fn set_secs(&mut self, secs: f64) {
-        self.secs = secs;
-        self.state = PlaybackState::Stopped;
-    }
-
     pub fn secs(&self) -> f64 {
         self.secs
     }
 
+    pub fn state(&self) -> PlaybackState {
+        self.state
+    }
+
     pub fn stop(&mut self) {
         self.secs = 0.;
+        self.state = PlaybackState::Stopped;
     }
 
     pub fn pause(&mut self) {
         self.state = PlaybackState::Paused;
+    }
+
+    pub fn play(&mut self) {
+        self.state = PlaybackState::Playing;
     }
 
     pub fn add_secs(&mut self, delta_secs: f64) {
