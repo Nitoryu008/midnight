@@ -5,10 +5,13 @@ use std::fs;
 use std::str;
 
 mod midi;
-use midi::{Channel, Channels, Tempo, Track};
+use midi::{Channel, Channels, SmfData, Tempo, Track};
 mod player;
 use player::Playback;
+mod display;
+use display::{ChannelText, TempoText};
 
+use crate::display::PlaybackStateText;
 use crate::player::PlaybackState;
 
 fn main() {
@@ -25,27 +28,22 @@ fn main() {
             smf,
             timing_unit: timing_unit as f64,
         })
-        .insert_resource(midi::Tempo::from_bpm(120.0))
+        .insert_resource(Tempo::from_bpm(120.0))
         .insert_resource(Playback::new())
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (update_midi_events, update_key_events, update_texts).chain(),
+            (
+                update_midi_events,
+                update_key_events,
+                update_channel_text,
+                update_tempo_text,
+                update_playback_state_text,
+            )
+                .chain(),
         )
         .run();
 }
-
-#[derive(Resource)]
-struct SmfData {
-    smf: Smf<'static>,
-    timing_unit: f64,
-}
-
-#[derive(Component)]
-struct ChannelText(u8);
-
-#[derive(Component)]
-struct TempoText;
 
 #[derive(Component)]
 struct Note {
@@ -53,11 +51,17 @@ struct Note {
     vel: u8,
 }
 
-fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time: Res<Time>) {
+fn setup(
+    mut commands: Commands,
+    smf_data: Res<SmfData>,
+    tempo: Res<Tempo>,
+    playback: Res<Playback>,
+) {
     commands.spawn(Camera2d);
 
     let mut title: &str = "";
 
+    // Extract title and track name
     for (index, track) in smf_data.smf.tracks.iter().enumerate() {
         for event in track {
             match event.kind {
@@ -82,6 +86,7 @@ fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time
         });
     }
 
+    // Title text
     commands.spawn((
         Text::new(format!("Title: {}", title)),
         TextFont {
@@ -98,6 +103,7 @@ fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time
         },
     ));
 
+    // MIDI channel texts
     for i in 0..16 {
         commands
             .spawn((
@@ -127,6 +133,7 @@ fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time
 
     commands.spawn(Channels::new());
 
+    // Tempo text
     commands
         .spawn((
             Text::new("Tempo: "),
@@ -151,6 +158,32 @@ fn setup(mut commands: Commands, smf_data: Res<SmfData>, tempo: Res<Tempo>, time
             },
             TempoText,
         ));
+
+    // Playback state text
+    commands
+        .spawn((
+            Text::new("Playback State: "),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            TextShadow::default(),
+            TextLayout::new_with_justify(JustifyText::Left),
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(25.0 + 20.0 * 18.0),
+                left: Val::Px(5.0),
+                ..default()
+            },
+        ))
+        .with_child((
+            TextSpan::new(format!("{:.2}", playback.state().to_string())),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            PlaybackStateText,
+        ));
 }
 
 fn update_key_events(keys: Res<ButtonInput<KeyCode>>, mut playback: ResMut<Playback>) {
@@ -167,14 +200,17 @@ fn update_key_events(keys: Res<ButtonInput<KeyCode>>, mut playback: ResMut<Playb
 }
 
 fn update_midi_events(
-    mut commands: Commands,
     smf_data: ResMut<SmfData>,
     time: Res<Time>,
     mut channels: Query<&mut Channels>,
     tracks: Query<&mut Track>,
     mut tempo: ResMut<Tempo>,
-    mut playback: ResMut<Playback>,
+    playback: Res<Playback>,
 ) {
+    if !playback.is_playing() {
+        return;
+    }
+
     let channels = &mut channels.single_mut().unwrap().0;
 
     for mut track in tracks {
@@ -204,6 +240,7 @@ fn update_midi_events(
     }
 }
 
+/// Event handler for track event.
 fn on_track_event(event: &TrackEvent, channels: &mut [Channel; 16], tempo: &mut ResMut<Tempo>) {
     match event.kind {
         TrackEventKind::Midi { channel, message } => {
@@ -252,11 +289,9 @@ fn on_track_event(event: &TrackEvent, channels: &mut [Channel; 16], tempo: &mut 
     }
 }
 
-fn update_texts(
+fn update_channel_text(
     channel_text: Query<(&mut TextSpan, &ChannelText)>,
     channels: Query<&Channels>,
-    mut tempo_text: Query<&mut TextSpan, (With<TempoText>, Without<ChannelText>)>,
-    tempo: Res<Tempo>,
 ) {
     let channels = &channels.single().unwrap().0;
 
@@ -268,7 +303,17 @@ fn update_texts(
             .collect::<Vec<String>>()
             .join(", ");
     }
+}
 
+fn update_tempo_text(tempo: Res<Tempo>, mut tempo_text: Query<&mut TextSpan, With<TempoText>>) {
     let mut tempo_text = tempo_text.single_mut().unwrap();
     **tempo_text = format!("{:.2}", tempo.bpm());
+}
+
+fn update_playback_state_text(
+    playback: Res<Playback>,
+    mut playback_text: Query<&mut TextSpan, With<PlaybackStateText>>,
+) {
+    let mut playback_text = playback_text.single_mut().unwrap();
+    **playback_text = playback.state().to_string();
 }

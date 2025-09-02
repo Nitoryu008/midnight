@@ -1,4 +1,11 @@
 use bevy::{platform::collections::HashSet, prelude::*};
+use midly::Smf;
+
+#[derive(Resource)]
+pub struct SmfData {
+    pub smf: Smf<'static>,
+    pub timing_unit: f64,
+}
 
 #[derive(Component)]
 pub struct Track {

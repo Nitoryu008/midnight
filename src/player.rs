@@ -1,3 +1,5 @@
+use std::fmt;
+
 use bevy::ecs::resource::Resource;
 
 #[derive(Resource)]
@@ -44,5 +46,22 @@ impl Playback {
 
     pub fn add_secs(&mut self, delta_secs: f64) {
         self.secs += delta_secs;
+    }
+
+    pub fn is_playing(&self) -> bool {
+        match self.state {
+            PlaybackState::Playing => true,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for PlaybackState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PlaybackState::Stopped => write!(f, "Stopped"),
+            PlaybackState::Playing => write!(f, "Playing"),
+            PlaybackState::Paused => write!(f, "Paused"),
+        }
     }
 }
