@@ -4,12 +4,14 @@ use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use std::fs;
 use std::str;
 
-mod midi;
-use midi::{Channel, Channels, SmfData, Tempo, Track};
-mod player;
-use player::Playback;
 mod display;
+mod midi;
+mod note;
+mod player;
+
 use display::{ChannelText, TempoText};
+use midi::{Channel, Channels, SmfData, Tempo, Track};
+use player::Playback;
 
 use crate::display::PlaybackStateText;
 use crate::player::PlaybackState;
