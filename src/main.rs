@@ -1,38 +1,31 @@
 use bevy::prelude::*;
+/*
 use midly::TrackEvent;
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use std::fs;
 use std::str;
+*/
 
 mod display;
-mod midi;
-mod note;
 mod player;
+mod smf;
 
+/*
 use display::{ChannelText, TempoText};
-use midi::{Channel, Channels, SmfData, Tempo, Track};
 use player::Playback;
+use smf::{Channel, Channels, SmfData, Tempo, Track};
 
 use crate::display::PlaybackStateText;
 use crate::player::PlaybackState;
+*/
 
 fn main() {
-    let raw = fs::read("test.mid").expect("cannot open test file").leak();
-    let smf = Smf::parse(raw).expect("cannot parse midi file");
-    let timing_unit = match smf.header.timing {
-        Timing::Metrical(u) => u.as_int(),
-        _ => panic!("SMPTE timing is not supported"),
-    };
-
     App::new()
         .add_plugins(DefaultPlugins)
-        .insert_resource(SmfData {
-            smf,
-            timing_unit: timing_unit as f64,
-        })
+        .add_systems(Startup, setup)
+        /*
         .insert_resource(Tempo::from_bpm(120.0))
         .insert_resource(Playback::new())
-        .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
@@ -43,16 +36,20 @@ fn main() {
                 update_playback_state_text,
             )
                 .chain(),
-        )
+        ) */
         .run();
 }
 
+fn setup(mut commands: Commands) {
+    commands.spawn(Camera2d);
+}
+
+/* TODO 本当に可読性が低いのでファイルを分ける
 #[derive(Component)]
 struct Note {
     key: u8,
     vel: u8,
 }
-
 fn setup(
     mut commands: Commands,
     smf_data: Res<SmfData>,
@@ -105,7 +102,6 @@ fn setup(
         },
     ));
 
-    // MIDI channel texts
     for i in 0..16 {
         commands
             .spawn((
@@ -225,7 +221,7 @@ fn update_midi_events(
             }
 
             let event = &events[track.next_event_index];
-            let midi_delta_secs = midi::get_delta_secs(
+            let midi_delta_secs = smf::get_delta_secs(
                 smf_data.timing_unit,
                 event.delta.as_int() as f64,
                 tempo.secs(),
@@ -319,3 +315,4 @@ fn update_playback_state_text(
     let mut playback_text = playback_text.single_mut().unwrap();
     **playback_text = playback.state().to_string();
 }
+*/

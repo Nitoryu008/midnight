@@ -2,28 +2,29 @@ use bevy::prelude::*;
 use midly::num::{u4, u7};
 
 #[derive(Component)]
-struct Note;
+pub struct Note;
 
 #[derive(Component)]
-struct Channel(u4);
+pub struct Channel(u4);
 
 #[derive(Component)]
-struct Key(u7);
+pub struct Key(u7);
 
 #[derive(Component)]
-struct Velocity(u7);
+pub struct Velocity(u7);
 
 #[derive(Component)]
-struct Duration(f64);
+pub struct Length(f64);
 
 #[derive(Component)]
-struct StartTime(f64);
+pub struct StartTime(f64);
 
 #[derive(Bundle)]
-struct NoteBundle {
+pub struct NoteBundle {
     ch: Channel,
     key: Key,
     vel: Velocity,
-    duration: Duration,
+    length: Length,
     start_time: StartTime,
+    note: Note,
 }
